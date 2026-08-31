@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@angular/common": "^21.2.22",
+    "@nativescript/core": "^9.1.0",
+    "@ngrx/store": "^17.2.0"
+  }
+}
