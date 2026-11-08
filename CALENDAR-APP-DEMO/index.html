@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f7f8fc">
+    <title>Daylight — Calendario mensual</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #222638;
+        background: #f7f8fc;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        --muted: #81869a;
+        --line: #e9eaf1;
+        --purple: #6c63e8;
+        --purple-dark: #554bd2;
+        --surface: #fff;
+      }
+
+      * { box-sizing: border-box; }
+      body { min-width: 320px; margin: 0; }
+      button, input, textarea { font: inherit; }
+      button { color: inherit; }
+      .app-shell { width: min(1200px, calc(100% - 48px)); margin: 0 auto; padding: 32px 0 48px; }
+      .topbar, .brand, .toolbar, .month-controls, .toolbar-actions, .modal-actions { display: flex; align-items: center; }
+      .topbar { justify-content: space-between; margin-bottom: 32px; }
+      .brand { gap: 12px; }
+      .brand-mark {
+        display: grid;
+        width: 42px;
+        height: 42px;
+        place-items: center;
+        border-radius: 13px;
+        color: #fff;
+        background: var(--purple);
+        box-shadow: 0 6px 14px #6c63e833;
+      }
+      .brand-mark svg { width: 22px; height: 22px; }
+      .brand-name { margin: 0; font-size: 17px; font-weight: 750; letter-spacing: -.3px; }
+      .brand-caption { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+      .today-label { color: #666b7d; font-size: 13px; font-weight: 600; }
+      .calendar-card { overflow: hidden; border: 1px solid #eeeff5; border-radius: 18px; background: var(--surface); box-shadow: 0 8px 32px #22263808; }
+      .toolbar { min-height: 92px; justify-content: space-between; gap: 20px; padding: 20px 24px; }
+      .month-controls { gap: 14px; }
+      .month-title { min-width: 208px; margin: 0; font-size: 22px; font-weight: 720; letter-spacing: -.55px; }
+      .month-navigation { display: flex; gap: 6px; }
+      .icon-button, .today-button, .primary-button, .secondary-button, .text-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: background .15s ease, border-color .15s ease, transform .15s ease;
+      }
+      .icon-button { width: 36px; height: 36px; border-color: var(--line); border-radius: 10px; background: #fff; }
+      .icon-button:hover, .today-button:hover, .secondary-button:hover { background: #f5f5fa; }
+      .icon-button svg { width: 16px; height: 16px; }
+      .today-button, .secondary-button { min-height: 38px; padding: 0 13px; border-color: var(--line); border-radius: 9px; background: #fff; font-size: 13px; font-weight: 600; }
+      .toolbar-actions { gap: 10px; }
+      .primary-button { min-height: 40px; padding: 0 15px; border-radius: 9px; color: #fff; background: var(--purple); font-size: 13px; font-weight: 650; }
+      .primary-button:hover { background: var(--purple-dark); }
+      .primary-button:active, .icon-button:active { transform: translateY(1px); }
+      .primary-button svg { width: 16px; height: 16px; }
+      .notice { margin: 0 24px 16px; padding: 11px 13px; border: 1px solid #f1c5c5; border-radius: 9px; color: #9c3434; background: #fff5f5; font-size: 13px; }
+      .notice[hidden] { display: none; }
+      .calendar-scroll { overflow-x: auto; }
+      .weekdays, .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); min-width: 680px; }
+      .weekdays { padding: 0 18px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #fcfcfe; }
+      .weekday { padding: 13px 8px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .75px; text-align: center; text-transform: uppercase; }
+      .day-cell { min-height: 116px; padding: 9px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+      .day-cell:nth-child(7n) { border-right: 0; }
+      .day-number {
+        display: grid;
+        width: 29px;
+        height: 29px;
+        margin: 0 auto 7px 0;
+        place-items: center;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: #4a4e60;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .day-number:hover { background: #f1f0ff; color: var(--purple-dark); }
+      .day-cell.outside-month .day-number { color: #b7bac7; }
+      .day-cell.is-today .day-number { color: #fff; background: var(--purple); font-weight: 700; }
+      .day-events { display: grid; gap: 5px; }
+      .event-row { display: flex; min-width: 0; align-items: center; gap: 3px; }
+      .event-chip {
+        overflow: hidden;
+        flex: 1;
+        min-width: 0;
+        padding: 5px 7px;
+        border: 0;
+        border-left: 2px solid #6c63e8;
+        border-radius: 4px;
+        color: #4f49aa;
+        background: #f0efff;
+        cursor: pointer;
+        font-size: 11px;
+        line-height: 1.25;
+        text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .event-chip:hover { background: #e6e4ff; }
+      .delete-event {
+        display: grid;
+        width: 23px;
+        height: 24px;
+        flex: 0 0 auto;
+        place-items: center;
+        border: 0;
+        border-radius: 5px;
+        color: #9397a7;
+        background: transparent;
+        cursor: pointer;
+        font-size: 15px;
+        line-height: 1;
+      }
+      .delete-event:hover { color: #b43e49; background: #fff0f0; }
+      .empty-state { padding: 40px 18px; color: var(--muted); font-size: 14px; text-align: center; }
+      .page-footer { display: flex; justify-content: space-between; gap: 16px; padding: 15px 24px; color: var(--muted); font-size: 12px; }
+      dialog {
+        width: min(440px, calc(100% - 32px));
+        max-height: calc(100% - 32px);
+        padding: 0;
+        overflow: auto;
+        border: 1px solid #ececf2;
+        border-radius: 16px;
+        background: #fff;
+        box-shadow: 0 24px 80px #1e203c33;
+      }
+      dialog::backdrop { background: #22263866; backdrop-filter: blur(2px); }
+      .event-form { padding: 24px; }
+      .modal-heading { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+      .modal-title { margin: 0; font-size: 19px; font-weight: 720; }
+      .modal-subtitle { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+      .close-button { width: 32px; height: 32px; border: 0; border-radius: 8px; background: #f5f5f8; cursor: pointer; font-size: 18px; }
+      .form-field { display: grid; gap: 7px; margin: 16px 0; }
+      .form-field label { color: #414558; font-size: 12px; font-weight: 650; }
+      .form-field input, .form-field textarea {
+        width: 100%;
+        padding: 11px 12px;
+        border: 1px solid #dfe1e9;
+        border-radius: 8px;
+        outline: none;
+        color: #222638;
+        background: #fff;
+        font-size: 14px;
+      }
+      .form-field input:focus, .form-field textarea:focus { border-color: var(--purple); box-shadow: 0 0 0 3px #6c63e81a; }
+      .form-field textarea { min-height: 82px; resize: vertical; }
+      .validation-message { margin: 0 0 12px; color: #aa3434; font-size: 12px; }
+      .validation-message:empty { display: none; }
+      .modal-actions { justify-content: space-between; gap: 10px; margin-top: 22px; }
+      .modal-actions-right { display: flex; gap: 8px; margin-left: auto; }
+      .text-button { min-height: 38px; padding: 0 10px; border: 0; border-radius: 8px; color: #ad3e48; background: transparent; font-size: 13px; font-weight: 600; }
+      .text-button:hover { background: #fff1f1; }
+      :focus-visible { outline: 3px solid #8e87f2; outline-offset: 2px; }
+
+      @media (max-width: 700px) {
+        .app-shell { width: min(100% - 24px, 560px); padding: 18px 0 28px; }
+        .topbar { margin-bottom: 20px; }
+        .today-label { display: none; }
+        .toolbar { align-items: flex-start; flex-direction: column; gap: 16px; padding: 17px 15px; }
+        .month-controls { width: 100%; justify-content: space-between; gap: 8px; }
+        .month-title { min-width: 0; font-size: 19px; }
+        .toolbar-actions { width: 100%; }
+        .toolbar-actions .primary-button { flex: 1; }
+        .weekdays, .calendar-grid { min-width: 0; }
+        .weekdays { padding: 0 8px; }
+        .weekday { padding: 11px 2px; font-size: 10px; letter-spacing: .3px; }
+        .day-cell { min-height: 92px; padding: 6px 5px; }
+        .day-number { width: 30px; height: 30px; margin-bottom: 5px; font-size: 11px; }
+        .day-events { gap: 3px; }
+        .event-row { gap: 0; }
+        .event-chip { padding: 4px 4px; font-size: 10px; }
+        .delete-event { display: none; }
+        .page-footer { flex-wrap: wrap; padding: 13px 15px; font-size: 11px; }
+      }
+
+      @media (max-width: 380px) {
+        .app-shell { width: calc(100% - 16px); }
+        .brand-caption { font-size: 11px; }
+        .today-button { padding: 0 9px; }
+        .day-cell { min-height: 82px; padding: 5px 3px; }
+        .weekdays, .calendar-grid { min-width: 0; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3.5" y="5" width="17" height="15.5" rx="3"></rect>
+              <path d="M7.5 3.5v3M16.5 3.5v3M3.5 9.5h17"></path>
+              <path d="m9 14 2 2 4-4"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="brand-name">Daylight</p>
+            <p class="brand-caption">Tu calendario personal</p>
+          </div>
+        </div>
+        <div class="today-label" id="today-label"></div>
+      </header>
+
+      <section class="calendar-card" aria-label="Calendario mensual">
+        <div class="toolbar">
+          <div class="month-controls">
+            <h1 class="month-title" id="month-title"></h1>
+            <div class="month-navigation" aria-label="Navegación por mes">
+              <button class="icon-button" id="previous-month" type="button" aria-label="Mes anterior">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+              </button>
+              <button class="icon-button" id="next-month" type="button" aria-label="Mes siguiente">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+              </button>
+            </div>
+            <button class="today-button" id="go-today" type="button">Hoy</button>
+          </div>
+          <div class="toolbar-actions">
+            <button class="primary-button" id="add-event" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+              Añadir evento
+            </button>
+          </div>
+        </div>
+
+        <p class="notice" id="notice" role="alert" hidden></p>
+
+        <div class="calendar-scroll">
+          <div class="weekdays" aria-hidden="true">
+            <div class="weekday">Lun</div><div class="weekday">Mar</div><div class="weekday">Mié</div>
+            <div class="weekday">Jue</div><div class="weekday">Vie</div><div class="weekday">Sáb</div><div class="weekday">Dom</div>
+          </div>
+          <div class="calendar-grid" id="calendar-grid" role="grid" aria-label="Días del calendario"></div>
+        </div>
+        <footer class="page-footer">
+          <span>Haz clic en una fecha para añadir un evento</span>
+          <span id="event-count"></span>
+        </footer>
+      </section>
+    </main>
+
+    <dialog id="event-dialog" aria-labelledby="modal-title">
+      <form class="event-form" id="event-form" novalidate>
+        <div class="modal-heading">
+          <div>
+            <h2 class="modal-title" id="modal-title">Añadir evento</h2>
+            <p class="modal-subtitle" id="modal-subtitle">Añade algo a tu calendario.</p>
+          </div>
+          <button class="close-button" id="close-dialog" type="button" aria-label="Cerrar ventana">×</button>
+        </div>
+        <div class="form-field">
+          <label for="event-title">Título</label>
+          <input id="event-title" name="title" type="text" maxlength="80" autocomplete="off" placeholder="Ej.: Reunión de equipo" required>
+        </div>
+        <div class="form-field">
+          <label for="event-date">Fecha</label>
+          <input id="event-date" name="date" type="date" required>
+        </div>
+        <div class="form-field">
+          <label for="event-description">Notas <span style="color: var(--muted); font-weight: 400;">(opcional)</span></label>
+          <textarea id="event-description" name="description" maxlength="300" placeholder="Añade algunos detalles..."></textarea>
+        </div>
+        <p class="validation-message" id="validation-message" role="alert" aria-live="polite"></p>
+        <div class="modal-actions">
+          <button class="text-button" id="delete-from-dialog" type="button" hidden>Eliminar evento</button>
+          <div class="modal-actions-right">
+            <button class="secondary-button" id="cancel-dialog" type="button">Cancelar</button>
+            <button class="primary-button" type="submit">Guardar evento</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <script>
+      (() => {
+        const STORAGE_KEY = "daylight-calendar-events";
+        const today = new Date();
+        const todayKey = formatDate(today);
+        const state = {
+          month: new Date(today.getFullYear(), today.getMonth(), 1),
+          selectedDate: todayKey,
+          events: loadEvents(),
+          editingId: null
+        };
+
+        const elements = {
+          title: document.getElementById("month-title"),
+          grid: document.getElementById("calendar-grid"),
+          eventCount: document.getElementById("event-count"),
+          todayLabel: document.getElementById("today-label"),
+          notice: document.getElementById("notice"),
+          dialog: document.getElementById("event-dialog"),
+          form: document.getElementById("event-form"),
+          modalTitle: document.getElementById("modal-title"),
+          modalSubtitle: document.getElementById("modal-subtitle"),
+          eventTitle: document.getElementById("event-title"),
+          eventDate: document.getElementById("event-date"),
+          eventDescription: document.getElementById("event-description"),
+          validation: document.getElementById("validation-message"),
+          deleteFromDialog: document.getElementById("delete-from-dialog")
+        };
+
+        document.getElementById("previous-month").addEventListener("click", () => changeMonth(-1));
+        document.getElementById("next-month").addEventListener("click", () => changeMonth(1));
+        document.getElementById("go-today").addEventListener("click", () => {
+          state.month = new Date(today.getFullYear(), today.getMonth(), 1);
+          state.selectedDate = todayKey;
+          render();
+        });
+        document.getElementById("add-event").addEventListener("click", () => openDialog(state.selectedDate));
+        document.getElementById("close-dialog").addEventListener("click", closeDialog);
+        document.getElementById("cancel-dialog").addEventListener("click", closeDialog);
+        document.getElementById("delete-from-dialog").addEventListener("click", () => deleteEvent(state.editingId));
+        elements.form.addEventListener("submit", saveEvent);
+        elements.grid.addEventListener("click", handleCalendarClick);
+        elements.dialog.addEventListener("click", (event) => {
+          if (event.target === elements.dialog) closeDialog();
+        });
+
+        elements.todayLabel.textContent = new Intl.DateTimeFormat("es", {
+          weekday: "long", month: "long", day: "numeric", year: "numeric"
+        }).format(today);
+        render();
+
+        function formatDate(date) {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const day = String(date.getDate()).padStart(2, "0");
+          return `${year}-${month}-${day}`;
+        }
+
+        function isValidDate(value) {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+          const [year, month, day] = value.split("-").map(Number);
+          const date = new Date(year, month - 1, day);
+          return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+        }
+
+        function loadEvents() {
+          let stored;
+          try {
+            stored = localStorage.getItem(STORAGE_KEY);
+          } catch (error) {
+            window.setTimeout(() => showNotice(`El almacenamiento del calendario no está disponible: ${error.message}`), 0);
+            return [];
+          }
+          if (stored === null) return [];
+          try {
+            const parsed = JSON.parse(stored);
+            if (!Array.isArray(parsed)) throw new Error("Los datos guardados no tienen el formato esperado.");
+            const validEvents = parsed.filter((event) =>
+              event &&
+              typeof event.id === "string" &&
+              typeof event.title === "string" &&
+              event.title.trim() !== "" &&
+              typeof event.date === "string" &&
+              isValidDate(event.date) &&
+              typeof event.description === "string"
+            );
+            if (validEvents.length !== parsed.length) {
+              const invalidCount = parsed.length - validEvents.length;
+              window.setTimeout(() => showNotice(`Se omitieron ${invalidCount} ${invalidCount === 1 ? "evento guardado" : "eventos guardados"} con datos no válidos.`), 0);
+            }
+            return validEvents;
+          } catch (error) {
+            window.setTimeout(() => showNotice(`No se pudieron leer los eventos guardados: ${error.message}`), 0);
+            return [];
+          }
+        }
+
+        function persistEvents() {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state.events));
+            showNotice("");
+            return true;
+          } catch (error) {
+            showNotice(`No se pudieron guardar los cambios en este navegador: ${error.message}`);
+            return false;
+          }
+        }
+
+        function showNotice(message) {
+          elements.notice.textContent = message;
+          elements.notice.hidden = !message;
+        }
+
+        function changeMonth(offset) {
+          state.month = new Date(state.month.getFullYear(), state.month.getMonth() + offset, 1);
+          render();
+        }
+
+        function render() {
+          const year = state.month.getFullYear();
+          const month = state.month.getMonth();
+          elements.title.textContent = new Intl.DateTimeFormat("es", {
+            month: "long", year: "numeric"
+          }).format(state.month);
+
+          const firstDay = new Date(year, month, 1);
+          const offset = (firstDay.getDay() + 6) % 7;
+          const firstVisible = new Date(year, month, 1 - offset);
+          const fragment = document.createDocumentFragment();
+
+          for (let index = 0; index < 42; index += 1) {
+            const date = new Date(firstVisible.getFullYear(), firstVisible.getMonth(), firstVisible.getDate() + index);
+            const dateKey = formatDate(date);
+            const cell = document.createElement("div");
+            cell.className = "day-cell";
+            cell.setAttribute("role", "gridcell");
+            if (date.getMonth() !== month) cell.classList.add("outside-month");
+            if (dateKey === todayKey) cell.classList.add("is-today");
+            cell.setAttribute("aria-label", new Intl.DateTimeFormat("es", {
+              weekday: "long", month: "long", day: "numeric", year: "numeric"
+            }).format(date));
+
+            const dayButton = document.createElement("button");
+            dayButton.type = "button";
+            dayButton.className = "day-number";
+            dayButton.dataset.action = "add";
+            dayButton.dataset.date = dateKey;
+            dayButton.textContent = String(date.getDate());
+            dayButton.setAttribute("aria-label", `Añadir evento el ${dateKey}`);
+            if (dateKey === todayKey) dayButton.setAttribute("aria-current", "date");
+            cell.append(dayButton);
+
+            const eventList = document.createElement("div");
+            eventList.className = "day-events";
+            eventList.setAttribute("role", "list");
+            state.events
+              .filter((event) => event.date === dateKey)
+              .sort((a, b) => a.title.localeCompare(b.title))
+              .forEach((event) => eventList.append(createEventRow(event)));
+            cell.append(eventList);
+            fragment.append(cell);
+          }
+
+          elements.grid.replaceChildren(fragment);
+          elements.eventCount.textContent = `${state.events.length} ${state.events.length === 1 ? "evento" : "eventos"} en total`;
+        }
+
+        function createEventRow(event) {
+          const row = document.createElement("div");
+          row.className = "event-row";
+          row.setAttribute("role", "listitem");
+
+          const editButton = document.createElement("button");
+          editButton.type = "button";
+          editButton.className = "event-chip";
+          editButton.dataset.action = "edit";
+          editButton.dataset.id = event.id;
+          editButton.textContent = event.title;
+          editButton.title = event.description ? `${event.title} — ${event.description}` : event.title;
+          editButton.setAttribute("aria-label", `Editar evento: ${event.title}`);
+
+          const deleteButton = document.createElement("button");
+          deleteButton.type = "button";
+          deleteButton.className = "delete-event";
+          deleteButton.dataset.action = "delete";
+          deleteButton.dataset.id = event.id;
+          deleteButton.textContent = "×";
+          deleteButton.setAttribute("aria-label", `Eliminar evento: ${event.title}`);
+
+          row.append(editButton, deleteButton);
+          return row;
+        }
+
+        function handleCalendarClick(event) {
+          const button = event.target.closest("button[data-action]");
+          if (!button) return;
+          if (button.dataset.action === "add") {
+            state.selectedDate = button.dataset.date;
+            openDialog(button.dataset.date);
+          } else if (button.dataset.action === "edit") {
+            const selectedEvent = state.events.find((item) => item.id === button.dataset.id);
+            if (selectedEvent) openDialog(selectedEvent.date, selectedEvent);
+          } else if (button.dataset.action === "delete") {
+            deleteEvent(button.dataset.id);
+          }
+        }
+
+        function openDialog(date, event = null) {
+          state.editingId = event ? event.id : null;
+          elements.form.reset();
+          elements.validation.textContent = "";
+          elements.modalTitle.textContent = event ? "Editar evento" : "Añadir evento";
+          elements.modalSubtitle.textContent = event ? "Actualiza los detalles del evento." : "Añade algo a tu calendario.";
+          elements.eventTitle.value = event ? event.title : "";
+          elements.eventDate.value = date;
+          elements.eventDescription.value = event ? event.description : "";
+          elements.deleteFromDialog.hidden = !event;
+          elements.dialog.showModal();
+          elements.eventTitle.focus();
+        }
+
+        function closeDialog() {
+          elements.dialog.close();
+          state.editingId = null;
+          elements.validation.textContent = "";
+        }
+
+        function saveEvent(event) {
+          event.preventDefault();
+          const title = elements.eventTitle.value.trim();
+          const date = elements.eventDate.value;
+          const description = elements.eventDescription.value.trim();
+          if (!title) {
+            elements.validation.textContent = "Escribe un título para el evento.";
+            elements.eventTitle.focus();
+            return;
+          }
+          if (title.length > 80) {
+            elements.validation.textContent = "El título debe tener 80 caracteres o menos.";
+            elements.eventTitle.focus();
+            return;
+          }
+          if (!isValidDate(date)) {
+            elements.validation.textContent = "Elige una fecha válida.";
+            elements.eventDate.focus();
+            return;
+          }
+          if (description.length > 300) {
+            elements.validation.textContent = "Las notas deben tener 300 caracteres o menos.";
+            elements.eventDescription.focus();
+            return;
+          }
+
+          if (state.editingId) {
+            state.events = state.events.map((item) => item.id === state.editingId
+              ? { ...item, title, date, description }
+              : item);
+          } else {
+            state.events.push({
+              id: typeof crypto !== "undefined" && crypto.randomUUID
+                ? crypto.randomUUID()
+                : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              title,
+              date,
+              description
+            });
+          }
+
+          state.selectedDate = date;
+          state.month = new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, 1);
+          persistEvents();
+          render();
+          closeDialog();
+        }
+
+        function deleteEvent(id) {
+          if (!id) return;
+          state.events = state.events.filter((event) => event.id !== id);
+          persistEvents();
+          render();
+          if (elements.dialog.open) closeDialog();
+        }
+      })();
+    </script>
+  </body>
+</html>
